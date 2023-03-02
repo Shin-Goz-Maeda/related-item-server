@@ -18,9 +18,9 @@ app.get("/", (req, res) => {
   res.send("<h1>hello</h1>");
 });
 
-// item情報をDBから取得する
+// すべてのitem情報をDBから取得する
 app.get("/getImage", (req, res) => {
-  let SQL = "SELECT * FROM ItemsInfo";
+  let SQL = "SELECT brand, item_category, item_name, item_img_url, id FROM items_info";
 
   db.query(SQL, (err, result) => {
     if (err) {
@@ -31,19 +31,18 @@ app.get("/getImage", (req, res) => {
   });
 });
 
-// instagram情報をDBから取得する
-app.get("/getInstagramImage", (req, res) => {
-  let SQL = "SELECT itemId, instagramEmbedCode FROM InstagramItemsInfo WHERE itemId = itemId";
-
-  db.query(SQL, (err, result) => {
+// 指定のitem情報をDBから取得する
+app.get("/item/:id", (req, res) => {
+  const id = req.params.id;
+  let SQL = "SELECT brand, item_category, item_name, item_img_url, item_info FROM items_info WHERE item_id = ?";
+  db.query(SQL, [id], (err, result) => {
     if (err) {
       console.log(err);
     } else {
-      res.send(result);
+      res.send(result[0]);
     }
   });
 });
-
 
 app.listen(3001, () => {
   console.log(" 3001 Server Start!")
