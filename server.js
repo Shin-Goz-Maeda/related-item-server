@@ -15,13 +15,12 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000/item/1')
   res.send("<h1>hello</h1>");
 });
 
 // すべてのitem情報をDBから取得する
 app.get("/getImage", (req, res) => {
-  let SQL = "SELECT brand, itemCategory, itemName, itemImgUrl, id FROM ItemsInfo";
+  let SQL = "SELECT brand, item_category, item_name, item_img_url, id FROM items_info";
 
   db.query(SQL, (err, result) => {
     if (err) {
@@ -35,7 +34,7 @@ app.get("/getImage", (req, res) => {
 // 指定のitem情報をDBから取得する
 app.get("/item/:id", (req, res) => {
   const id = req.params.id;
-  let SQL = "SELECT brand, itemCategory, itemName, itemImgUrl, itemInfo FROM ItemsInfo WHERE itemId = ?";
+  let SQL = "SELECT brand, item_category, item_name, item_img_url, item_info FROM items_info WHERE item_id = ?";
   db.query(SQL, [id], (err, result) => {
     if (err) {
       console.log(err);
