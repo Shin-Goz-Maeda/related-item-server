@@ -31,15 +31,14 @@ app.get("/getImage", (req, res) => {
   });
 });
 
-// 指定のitem情報をDBから取得する
 app.get("/item/:id", (req, res) => {
   const id = req.params.id;
-  let SQL = "SELECT brand, item_category, item_name, item_img_url, item_info FROM items_info WHERE item_id = ?";
+  let SQL = "SELECT brand, item_category, item_name, item_img_url, item_info, instagram_embed_code FROM items_info INNER JOIN instagram_items_info ON items_info.item_id = instagram_items_info.item_id WHERE instagram_items_info.item_id = ?";
   db.query(SQL, [id], (err, result) => {
     if (err) {
       console.log(err);
     } else {
-      res.send(result[0]);
+      res.send(result);
     }
   });
 });
