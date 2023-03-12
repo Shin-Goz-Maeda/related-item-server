@@ -1,15 +1,23 @@
 const express = require("express");
 const app = express();
-const mysql = require("mysql2");
 const cors = require("cors");
-const env = require('dotenv').config();
 
-const db = mysql.createConnection({
-  host: process.env.DB_KEY1,
-  user: process.env.DB_KEY2,
-  password: process.env.DB_KEY3,
-  database: process.env.DB_KEY4
-});
+// db設定
+const { db } = require('../related-item-server/db/db');
+
+// firebase設定
+const {
+  auth,
+  googleProvider
+} = require("../related-item-server/firebase/firebase");
+
+// firebaseメソッド
+const {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+} = require("firebase/auth");
+const { async } = require("@firebase/util");
 
 app.use(cors());
 app.use(express.json());
@@ -31,6 +39,7 @@ app.get("/getImage", (req, res) => {
   });
 });
 
+// DBからアイテム情報の詳細を取得する
 app.get("/item/:id", (req, res) => {
   const id = req.params.id;
   let SQL = "SELECT brand, item_category, item_name, item_img_url, item_info, instagram_embed_code FROM items_info INNER JOIN instagram_items_info ON items_info.item_id = instagram_items_info.item_id WHERE instagram_items_info.item_id = ?";
@@ -41,6 +50,62 @@ app.get("/item/:id", (req, res) => {
       res.send(result);
     }
   });
+});
+
+// firebaseからメールアドレス/PWを使用したログイン処理
+app.post("/login", (req, res) => {
+  const email = req.body.email;
+  const password = req.body.password;
+  console.log(email)
+  console.log(password)
+  signInWithEmailAndPassword(auth, email, password)
+    .then((result) => {
+      res.send(result)
+    })
+    .catch((err) => {
+      console.log(err)
+    })
+});
+
+// firebaseからメールアドレス/PWを使用したサインアップ処理
+app.post("/signup", (req, res) => {
+  const email = req.body.email;
+  const password = req.body.password;
+  let userState = req.body.userState;
+  const createdAt = req.body.createdAt;
+  let updatedAt = req.body.updatedAt;
+
+  // アカウント登録した情報をDBに登録する
+  const SQL1 = "INSERT INTO users (mail_address, user_state, created_at, updated_at) VALUE (?, ?, ?, ?)";
+  db.query(SQL1, [email, userState, createdAt, updatedAt], (err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      console.log(result);
+    }
+  });
+
+  // メールアドレス/PWをfirebaseに登録する
+  createUserWithEmailAndPassword(auth, email, password)
+    .then((result) => {
+      res.send(result)
+
+      // firebaseに登録が完了したらuserStateを1にする
+      if (userState === 0) {
+        userState = 1;
+        db.query("UPDATE users SET user_state = ? WHERE mail_address = ?", [userState, email], (err, result) => {
+          if (err) {
+            console.log(err);
+          } else {
+            console.log(result);
+          }
+        }
+        )
+      }
+    })
+    .catch((err) => {
+      console.log(err)
+    })
 });
 
 app.listen(3001, () => {
