@@ -8,14 +8,14 @@ const { db } = require('../related-item-server/db/db');
 // firebase設定
 const {
   auth,
-  googleProvider
 } = require("../related-item-server/firebase/firebase");
 
 // firebaseメソッド
 const {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  sendEmailVerification,
+  getIdTokenResult,
 } = require("firebase/auth");
 const { async } = require("@firebase/util");
 
@@ -56,11 +56,24 @@ app.get("/item/:id", (req, res) => {
 app.post("/login", (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
+  let userState = req.body.userState;
+
   console.log(email)
   console.log(password)
   signInWithEmailAndPassword(auth, email, password)
     .then((result) => {
       res.send(result)
+      if (result.user.emailVerified) {
+        userState = 2;
+        db.query("UPDATE users SET user_state = ? WHERE mail_address = ?", [userState, email], (err, result) => {
+          if (err) {
+            console.log(err);
+          } else {
+            console.log(result);
+          }
+        }
+        )
+      }
     })
     .catch((err) => {
       console.log(err)
@@ -68,12 +81,13 @@ app.post("/login", (req, res) => {
 });
 
 // firebaseからメールアドレス/PWを使用したサインアップ処理
-app.post("/signup", (req, res) => {
+app.post("/signup", async (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
   let userState = req.body.userState;
   const createdAt = req.body.createdAt;
   let updatedAt = req.body.updatedAt;
+  let user = "";
 
   // アカウント登録した情報をDBに登録する
   const SQL1 = "INSERT INTO users (mail_address, user_state, created_at, updated_at) VALUE (?, ?, ?, ?)";
@@ -86,9 +100,10 @@ app.post("/signup", (req, res) => {
   });
 
   // メールアドレス/PWをfirebaseに登録する
-  createUserWithEmailAndPassword(auth, email, password)
+  await createUserWithEmailAndPassword(auth, email, password)
     .then((result) => {
       res.send(result)
+      user = getIdTokenResult.user
 
       // firebaseに登録が完了したらuserStateを1にする
       if (userState === 0) {
@@ -106,6 +121,14 @@ app.post("/signup", (req, res) => {
     .catch((err) => {
       console.log(err)
     })
+
+    await sendEmailVerification(auth.currentUser)
+      .then((result) => {
+        console.log(result)
+      })
+      .catch((error) => {
+        console.log(error)
+      })
 });
 
 app.listen(3001, () => {
