@@ -61,7 +61,6 @@ app.post("/login", (req, res) => {
   console.log(password)
   signInWithEmailAndPassword(auth, email, password)
     .then((result) => {
-      res.send(result)
       if (result.user.emailVerified) {
         // メールアドレス認証が完了しているアドレスはDBのuser_stateを2に変更する。
         userState = 2;
@@ -71,8 +70,10 @@ app.post("/login", (req, res) => {
           } else {
             console.log(result);
           }
-        }
-        )
+        })
+        res.send(result)
+      } else {
+        res.send("1");
       }
     })
     .catch((err) => {
@@ -82,7 +83,7 @@ app.post("/login", (req, res) => {
 
 // firebaseからメールアドレス/PWを使用したサインアップ処理
 app.post("/signup", (req, res) => {
-  // メモ：後ほど削除予定
+  // MEMO：後ほど削除予定
   /* DBにメールアドレスの登録がないかを判定
   * DBに登録がなかったらfirebaseに登録
   * サインアップページを登録アドレスに誘導
@@ -99,18 +100,18 @@ app.post("/signup", (req, res) => {
   // DBにすでに登録されているアドレスがないかをチェックする。
   db.query("SELECT COUNT(mail_address) AS email FROM users WHERE mail_address = ?", [email], (err, result) => {
     if(result[0].email === 0) {
-      console.log(result)
       const SQL1 = "INSERT INTO users (user_state, mail_address, created_at, updated_at) VALUE (?, ?, ?, ?)";
       db.query(SQL1, [userState, email, createdAt, updatedAt], (err, result) => {
           // メールアドレス/PWをfirebaseに登録する
           createUserWithEmailAndPassword(auth, email, password)
             .then((result) => {
               res.send(result)
-              user = getIdTokenResult.user
+              user = getIdTokenResult.user;
+              const uuid = result.user.uid;
               // firebaseに登録が完了したらuserStateを1にする
               if (userState === 0) {
                 userState = 1;
-                db.query("UPDATE users SET user_state = ? WHERE mail_address = ?", [userState, email], (err, result) => {
+                db.query("UPDATE users SET user_state = ?, uuid = ? WHERE mail_address = ?", [userState, uid, email], (err, result) => {
                   if (err) {
                     console.log(err);
                   } else {
@@ -130,7 +131,7 @@ app.post("/signup", (req, res) => {
               res.send(err)
             })
       });
-    } else {
+                  } else {
       console.log("このメールアドレスは登録されています。");
     }
   });
@@ -139,3 +140,5 @@ app.post("/signup", (req, res) => {
 app.listen(3001, () => {
   console.log(" 3001 Server Start!")
 });
+
+
