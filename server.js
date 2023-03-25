@@ -57,8 +57,8 @@ app.get("/item/:id", (req, res) => {
 // firebaseのメールアドレス/PW認証を使用したログイン処理
 app.post("/login-mail", (req, res) => {
   // ログインフォームに入力された値をクライアントから取得
-  const email = req.body.email;
-  const password = req.body.password;
+  const email = req.body.a;
+  const password = req.body.b;
 
   // firebaseのログインメソッド
   signInWithEmailAndPassword(auth, email, password)
@@ -84,10 +84,10 @@ app.post("/login-mail", (req, res) => {
 // firebaseのGoogle認証を使用したログイン処理
 app.post("/login-google", (req, res) => {
   // Google認証を使ってログインした結果をクライアントから取得
-  const provider = req.body.provider;
-  const email = req.body.email;
-  const uuid = req.body.uuid;
-  const createdAt = req.body.createdAt;
+  const provider = req.body.a;
+  const email = req.body.b;
+  const uuid = req.body.c;
+  const createdAt = req.body.d;
   const updatedAt = null;
   const userState = 2;
   const userDelete = 0;
@@ -120,10 +120,10 @@ app.post("/login-google", (req, res) => {
 // firebaseのメールアドレス/PWを使用したサインアップ処理
 app.post("/signup-mail", (req, res) => {
   // サインアップフォームに入力された値をクライアントから取得
-  const email = req.body.email;
-  const password = req.body.password;
-  const createdAt = req.body.createdAt;
-  const updatedAt = req.body.updatedAt;
+  const email = req.body.a;
+  const password = req.body.b;
+  const createdAt = req.body.c;
+  const updatedAt = req.body.d;
   const provider = "email";
   const userDelete = 0;
   let userState = 0;
@@ -168,9 +168,19 @@ app.post("/signup-mail", (req, res) => {
         });
 
     } else if (result[0].mail_address && result[0].user_delete === 1) {
-      // 過去に登録したことがあり、退会したユーザは別アドレスを使用するようにブラウザに表示。
-      res.send("1");
+      // 退会ユーザの場合は、退会ステータスを退会していない状態へステータスを変更し、DB内のユーザーステータスをリセット
+      db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [userDelete, updatedAt, email]);
+      db.query("UPDATE users_info SET user_name = NULL, sex = NULL, birth_date = NULL, updated_at = ? WHERE mail_address = ?", [updatedAt, email]);
+      db.query("UPDATE users_want_to_item SET want_to_item = NULL WHERE mail_address = ?", [email]);
 
+      // firebaseのログインメソッド
+      signInWithEmailAndPassword(auth, email, password)
+        .then((result) => {
+          res.send(result);
+        })
+        .catch((err) => {
+          res.send(err);
+        })
     } else {
       // Google認証を使って登録しているユーザーor既にメール認証で登録済のユーザーに対してブラウザにエラーを表示。
       res.send("2");
@@ -182,10 +192,10 @@ app.post("/signup-mail", (req, res) => {
 // firebaseのGoogle認証を使用したサインアップ処理
 app.post("/signup-google", (req, res) => {
   // Google認証を使ってログインした結果をクライアントから取得
-  const provider = req.body.provider;
-  const email = req.body.email;
-  const uuid = req.body.uuid;
-  const createdAt = req.body.createdAt;
+  const provider = req.body.a;
+  const email = req.body.b;
+  const uuid = req.body.c;
+  const createdAt = req.body.d;
   const updatedAt = null;
   const userState = 2;
   const userDelete = 0;
@@ -217,7 +227,7 @@ app.post("/signup-google", (req, res) => {
 // ユーザーが初回ログインかどうかを確認する処理
 app.post("/login-first", (req, res) => {
   // ログインフォームに入力された値をクライアントから取得
-  const email = req.body.email;
+  const email = req.body.a;
 
   // アカウント情報が登録されていないかを確認
   db.query("SELECT user_name, sex, birth_date FROM users_info WHERE mail_address = ?", [email], (err, result) => {
@@ -260,31 +270,10 @@ app.post("/user-info", (req, res) => {
 });
 
 
-// app.post("/resend-auth-mail", (req, res) => {
-//   const email = req.body.email;
-//   const password = req.body.password;
-
-//   signInWithEmailAndPassword(auth, email, password)
-//     .then((result) => {
-//       res.send(result);
-//       // メール認証完了後のリダイレクトURL
-//       const actionCodeSettings = {
-//         url: 'http://localhost:3000/login',
-//         handleCodeInApp: false
-//       };
-
-//       sendEmailVerification(auth.currentUser, actionCodeSettings);
-//     })
-//     .catch((err) => {
-//       res.send(err);
-//     });
-// });
-
-
 // 退会ユーザーの処理
 app.post("/withdrawal", (req, res) => {
   // フォームに入力した値を取得
-  const email = req.body.email;
+  const email = req.body.a;
   const userDelete = 1;
 
   // DB-user_deleteを退会済みステータスに変更
@@ -302,5 +291,5 @@ app.post("/withdrawal", (req, res) => {
 
 // 待ち受け処理
 app.listen(3001, () => {
-  console.log(" 3001 Server Start!");
+  console.log("3001 Server Start!");
 });

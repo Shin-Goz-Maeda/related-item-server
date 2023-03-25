@@ -1,2 +1,6 @@
+#general
 node_modules
 .env
+
+#dumpfile
+db/dump-2023-03-25.txt
