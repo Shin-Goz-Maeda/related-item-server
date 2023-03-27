@@ -1,7 +1,7 @@
 // express設定
 const express = require("express");
-const app = express();
 const cors = require("cors");
+const app = express();
 
 app.use(cors());
 app.use(express.json());
@@ -19,6 +19,23 @@ const {
   sendEmailVerification
 } = require("firebase/auth");
 
+// ユーザーステータス
+const userState = {
+  // 退会ステータス
+  user_not_withdrawal: 0,
+  user_withdrawal: 1,
+
+  // メール認証状態
+  user_add_DB_ok: 0,
+  user_add_firebaseAuth_ok: 1,
+  user_mailVerified_ok:2
+};
+
+// 日時設定
+const dateState = {
+  createdAt: Date.now(),
+  updatedAt: Date.now()
+};
 
 // server動作確認
 app.get("/", (req, res) => {
@@ -57,8 +74,8 @@ app.get("/item/:id", (req, res) => {
 // firebaseのメールアドレス/PW認証を使用したログイン処理
 app.post("/login-mail", (req, res) => {
   // ログインフォームに入力された値をクライアントから取得
-  const email = req.body.a;
-  const password = req.body.b;
+  const email = req.body.email;
+  const password = req.body.password;
 
   // firebaseのログインメソッド
   signInWithEmailAndPassword(auth, email, password)
@@ -66,12 +83,11 @@ app.post("/login-mail", (req, res) => {
       // ログインユーザーのメール認証状況を確認
       if (result.user.emailVerified) {
         // メールアドレス認証が完了しているメールアドレスはDB-users-user_stateを"2"に変更する。
-        let userState = 2;
-        db.query("UPDATE users SET user_state = ? WHERE mail_address = ?", [userState, email]);
+        db.query("UPDATE users SET user_state = ?, updated_at = ? WHERE mail_address = ?", [userState.user_mailVerified_ok, dateState.updatedAt, email]);
         res.send(result);
       } else {
-        // メール認証を完了して再ログインを促すようにする。
-        res.status(401).send(result);
+        // メール認証を完了していない場合は、ステータス2を返す。
+        res.send("2");
       };
     })
     .catch((error) => {
@@ -84,32 +100,30 @@ app.post("/login-mail", (req, res) => {
 // firebaseのGoogle認証を使用したログイン処理
 app.post("/login-google", (req, res) => {
   // Google認証を使ってログインした結果をクライアントから取得
-  const provider = req.body.a;
-  const email = req.body.b;
-  const uuid = req.body.c;
-  const createdAt = req.body.d;
-  const updatedAt = null;
-  const userState = 2;
-  const userDelete = 0;
+  const email = req.body.email;
+  const uuid = req.body.uuid;
+  const provider = req.body.provider;
 
   // DBにメールアドレスの登録があるか&退会したユーザーではないかを確認
-  db.query("SELECT mail_address, user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
+  db.query("SELECT user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
     // メールアドレスの登録がなく、退会ユーザーではない場合はDBに情報を追加
     if (!result[0]) {
-      const SQL1 = "INSERT INTO users (uuid, user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?, ?)";
-      db.query(SQL1, [uuid, userState, userDelete, email, provider, createdAt, updatedAt]);
-      db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, createdAt, updatedAt]);
-      db.query("INSERT INTO users_want_to_item (mail_address) VALUE (?)", [email]);
+      const SQL = "INSERT INTO users (uuid, user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?, ?)";
+      db.query(SQL, [uuid, userState.user_add_DB_ok, userState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
+
+      db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
+
+      db.query("INSERT INTO users_want_to_item (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
 
     } else if (result[0].user_delete === 1) {
       // 退会ユーザの場合は、退会ステータスを退会していない状態へ変更
-      db.query("UPDATE users SET user_delete = ? WHERE mail_address = ?", [userDelete, email]);
+      db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [userState.user_not_withdrawal, dateState.updatedAt, email]);
 
     } else if (result[0].user_delete === 0) {
-      // 以前メールアドレスで会員登録済のユーザがGoogle認証で登録した場合にメールアドレス認証からGoogle認証にログイン方法が変更になった場合に下記をコンソールに表示(ログインに問題なし)
-      console.log("登録されています。");
+      // 以前メールアドレスで会員登録済のユーザがGoogle認証で登録した場合
+      db.query("UPDATE users SET provider = ? WHERE mail_address = ?", [provider, email]);
 
-    } else if (result[0].user_delete === 0) {
+    } else {
       // 何らかのエラーがあった場合にコンソールに表示
       console.log(err);
     };
@@ -120,21 +134,17 @@ app.post("/login-google", (req, res) => {
 // firebaseのメールアドレス/PWを使用したサインアップ処理
 app.post("/signup-mail", (req, res) => {
   // サインアップフォームに入力された値をクライアントから取得
-  const email = req.body.a;
-  const password = req.body.b;
-  const createdAt = req.body.c;
-  const updatedAt = req.body.d;
+  const email = req.body.email;
+  const password = req.body.password;
   const provider = "email";
-  const userDelete = 0;
-  let userState = 0;
 
   // 登録済のユーザーではないかを確認
-  db.query("SELECT mail_address, user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
+  db.query("SELECT user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
     // 登録していないユーザーの場合は下記処理を実行
     if (!result[0]) {
       // DB-usersにユーザ情報を追加する。
-      const SQL1 = "INSERT INTO users (user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?)";
-      db.query(SQL1, [userState, userDelete, email, provider, createdAt, updatedAt]);
+      const SQL = "INSERT INTO users (user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?)";
+      db.query(SQL, [userState.user_add_DB_ok, userState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
 
       // メールアドレス/PWをfirebaseに登録する
       createUserWithEmailAndPassword(auth, email, password)
@@ -144,34 +154,39 @@ app.post("/signup-mail", (req, res) => {
           // ユーザー個別のIDをfirebaseから取得
           const uuid = result.user.uid;
 
-          // firebaseに登録が完了したらuserStateを1にする
-          if (userState === 0) {
-            userState = 1;
-            // DBの各テーブルに登録ユーザー情報を追加する。
-            db.query("UPDATE users SET user_state = ?, uuid = ? WHERE mail_address = ?", [userState, uuid, email]);
-            db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, createdAt, updatedAt]);
-            db.query("INSERT INTO users_want_to_item (mail_address) VALUE (?)", [email]);
-          };
+          db.query("SELECT user_state FROM users WHERE mail_address = ?", [email], (err, result) => {
+            // firebaseに登録が完了したらuserStateを1にする
+            if (result[0].user_state === 0) {
+              // DBの各テーブルに登録ユーザー情報を追加する。
+              db.query("UPDATE users SET user_state = ?, uuid = ?, updated_at = ? WHERE mail_address = ?", [userState.user_add_firebaseAuth_ok, uuid, dateState.updatedAt, email]);
 
-          // メール認証完了後のリダイレクトURL
-          const actionCodeSettings = {
-            url: 'http://localhost:3000/login',
-            handleCodeInApp: false
-          };
+              db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
 
-          // メール認証を行うメールを送信
-          sendEmailVerification(auth.currentUser, actionCodeSettings);
+              db.query("INSERT INTO users_want_to_item (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
+            };
+
+            // メール認証完了後のリダイレクトURL
+            const actionCodeSettings = {
+              url: 'http://localhost:3000/login',
+              handleCodeInApp: false
+            };
+
+            // メール認証を行うメールを送信
+            sendEmailVerification(auth.currentUser, actionCodeSettings);
+          });
         })
         .catch((err) => {
           // 登録できたかった場合にコンソールにエラー表示する。
           console.log(err);
         });
 
-    } else if (result[0].mail_address && result[0].user_delete === 1) {
+    } else if (result[0].user_delete === 1) {
       // 退会ユーザの場合は、退会ステータスを退会していない状態へステータスを変更し、DB内のユーザーステータスをリセット
-      db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [userDelete, updatedAt, email]);
-      db.query("UPDATE users_info SET user_name = NULL, sex = NULL, birth_date = NULL, updated_at = ? WHERE mail_address = ?", [updatedAt, email]);
-      db.query("UPDATE users_want_to_item SET want_to_item = NULL WHERE mail_address = ?", [email]);
+      db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [userState.user_not_withdrawal, dateState.updatedAt, email]);
+
+      db.query("UPDATE users_info SET user_name = NULL, sex = NULL, birth_date = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
+
+      db.query("UPDATE users_want_to_item SET want_to_item = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
 
       // firebaseのログインメソッド
       signInWithEmailAndPassword(auth, email, password)
@@ -182,7 +197,7 @@ app.post("/signup-mail", (req, res) => {
           res.send(err);
         })
     } else {
-      // Google認証を使って登録しているユーザーor既にメール認証で登録済のユーザーに対してブラウザにエラーを表示。
+      // Google認証を使って登録しているユーザーor既にメール認証で登録済のユーザーに対してブラウザにエラーを表示（すでに登録しているユーザーの場合は2を返す）。
       res.send("2");
     };
   });
@@ -192,29 +207,28 @@ app.post("/signup-mail", (req, res) => {
 // firebaseのGoogle認証を使用したサインアップ処理
 app.post("/signup-google", (req, res) => {
   // Google認証を使ってログインした結果をクライアントから取得
-  const provider = req.body.a;
-  const email = req.body.b;
-  const uuid = req.body.c;
-  const createdAt = req.body.d;
-  const updatedAt = null;
-  const userState = 2;
-  const userDelete = 0;
+  const email = req.body.email;
+  const uuid = req.body.uuid;
+  const provider = req.body.provider;
 
   // 過去に登録したユーザではないかを確認
-  db.query("SELECT mail_address, user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
+  db.query("SELECT user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
     if (!result[0]) {
       // 過去に登録のないユーザーの場合は、DBの各テーブルにユーザー情報を追加
-      const SQL1 = "INSERT INTO users (uuid, user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?, ?)";
-      db.query(SQL1, [uuid, userState, userDelete, email, provider, createdAt, updatedAt]);
-      db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, createdAt, updatedAt]);
-      db.query("INSERT INTO users_want_to_item (mail_address) VALUE (?)", [email]);
+      const SQL = "INSERT INTO users (uuid, user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?, ?)";
+      db.query(SQL, [uuid, userState.user_add_DB_ok, userState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
+
+      db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
+
+      db.query("INSERT INTO users_want_to_item (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
+
     } else if (result[0].user_delete === 1) {
       // 退会ユーザの場合は、退会ステータスを退会していない状態へ変更
-      db.query("UPDATE users SET user_delete = ? WHERE mail_address = ?", [userDelete, email]);
+      db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [userState.user_not_withdrawal, dateState.updatedAt, email]);
 
     } else if (result[0].user_delete === 0) {
-      // 以前メールアドレスで会員登録済のユーザがGoogle認証で登録した場合にメールアドレス認証からGoogle認証にログイン方法が変更になった場合に下記をコンソールに表示(ログインに問題なし)
-      console.log("登録されています。");
+      // 以前メールアドレスで会員登録済のユーザがGoogle認証で登録した場合
+      db.query("UPDATE users SET provider = ? WHERE mail_address = ?", [provider, email]);
 
     } else {
       // 何らかのエラーがあった場合にコンソールに表示
@@ -227,7 +241,7 @@ app.post("/signup-google", (req, res) => {
 // ユーザーが初回ログインかどうかを確認する処理
 app.post("/login-first", (req, res) => {
   // ログインフォームに入力された値をクライアントから取得
-  const email = req.body.a;
+  const email = req.body.email;
 
   // アカウント情報が登録されていないかを確認
   db.query("SELECT user_name, sex, birth_date FROM users_info WHERE mail_address = ?", [email], (err, result) => {
@@ -241,7 +255,7 @@ app.post("/login-first", (req, res) => {
 
     } else {
       // 登録済の場合は下記上情報をクライアントに送信
-      res.status(400).send(result[0]);
+      res.status(201).send(result[0]);
     };
   });
 });
@@ -257,8 +271,9 @@ app.post("/user-info", (req, res) => {
   const recommendItems = req.body.recommendItemJson;
 
   // DBの各テーブルにアカウント情報に情報を追加
-  db.query("UPDATE users_info SET user_name = ?, sex = ?, birth_date = ? WHERE mail_address = ?", [userName, sex, birthDay, email]);
-  db.query("UPDATE users_want_to_item SET want_to_item = ? WHERE mail_address = ?", [ recommendItems, email], (err, result) => {
+  db.query("UPDATE users_info SET user_name = ?, sex = ?, birth_date = ?, updated_at = ? WHERE mail_address = ?", [userName, sex, birthDay, dateState.updatedAt, email]);
+
+  db.query("UPDATE users_want_to_item SET want_to_item = ?, updated_at = ? WHERE mail_address = ?", [recommendItems, dateState.updatedAt, email], (err, result) => {
     if (err) {
       // 何らかのエラーが発生した場合は下記をクライアントに送信
       res.status(400).send(result[0]);
@@ -273,11 +288,10 @@ app.post("/user-info", (req, res) => {
 // 退会ユーザーの処理
 app.post("/withdrawal", (req, res) => {
   // フォームに入力した値を取得
-  const email = req.body.a;
-  const userDelete = 1;
+  const email = req.body.email;
 
   // DB-user_deleteを退会済みステータスに変更
-  db.query("UPDATE users SET user_delete = ? WHERE mail_address = ?", [userDelete, email], (err, result) => {
+  db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [userState.user_withdrawal, dateState.updatedAt, email], (err, result) => {
     if (err) {
       // 何らかのエラーが発生した場合コンソールに表示
       console.log(err);
@@ -290,6 +304,8 @@ app.post("/withdrawal", (req, res) => {
 
 
 // 待ち受け処理
-app.listen(3001, () => {
-  console.log("3001 Server Start!");
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}...`);
 });
