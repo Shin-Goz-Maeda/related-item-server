@@ -12,34 +12,29 @@ const { db } = require("../related-item-server/db/db");
 // firebase設定インポート
 const { auth } = require("../related-item-server/firebase/firebase");
 
+// 共通する定数
+const { userState, dateState, sendError } = require("./constants/constants");
+
 // firebaseメソッド
 const {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  sendEmailVerification
+  sendEmailVerification,
+  onAuthStateChanged
 } = require("firebase/auth");
 
-// ユーザーステータス
-const userState = {
-  // 退会ステータス
-  user_not_withdrawal: 0,
-  user_withdrawal: 1,
-
-  // メール認証状態
-  user_add_DB_ok: 0,
-  user_add_firebaseAuth_ok: 1,
-  user_mailVerified_ok:2
-};
-
-// 日時設定
-const dateState = {
-  createdAt: Date.now(),
-  updatedAt: Date.now()
-};
 
 // server動作確認
 app.get("/", (req, res) => {
   res.send("<h1>hello</h1>");
+});
+
+
+// ブラウザをリロードしたときログインしているユーザーを取得
+app.get("/onuser", (req, res) => {
+  onAuthStateChanged(auth, (user) => {
+    res.send(user);
+  });
 });
 
 
@@ -48,7 +43,7 @@ app.get("/getImage", (req, res) => {
   const SQL = "SELECT brand, item_category, item_name, item_img_url, id FROM items_info";
   db.query(SQL, (err, result) => {
     if (err) {
-      console.log(err);
+      console.log("エラー46", err.message);
     } else {
       res.send(result);
     };
@@ -63,7 +58,9 @@ app.get("/item/:id", (req, res) => {
   const SQL = "SELECT brand, item_category, item_name, item_img_url, item_info, instagram_embed_code FROM items_info INNER JOIN instagram_items_info ON items_info.item_id = instagram_items_info.item_id WHERE instagram_items_info.item_id = ?";
   db.query(SQL, [id], (err, result) => {
     if (err) {
-      console.log(err);
+      console.log("エラー61", err.message);
+    } else if (result.length > 0) {
+      res.send(result);
     } else {
       res.send(result);
     };
@@ -86,8 +83,8 @@ app.post("/login-mail", (req, res) => {
         db.query("UPDATE users SET user_state = ?, updated_at = ? WHERE mail_address = ?", [userState.user_mailVerified_ok, dateState.updatedAt, email]);
         res.send(result);
       } else {
-        // メール認証を完了していない場合は、ステータス2を返す。
-        res.send("2");
+        // メール認証を完了していない場合
+        res.send(sendError);
       };
     })
     .catch((error) => {
@@ -125,7 +122,7 @@ app.post("/login-google", (req, res) => {
 
     } else {
       // 何らかのエラーがあった場合にコンソールに表示
-      console.log(err);
+      console.log("エラー125", err.message);
     };
   });
 });
@@ -177,7 +174,7 @@ app.post("/signup-mail", (req, res) => {
         })
         .catch((err) => {
           // 登録できたかった場合にコンソールにエラー表示する。
-          console.log(err);
+          console.log("エラー177", err.message);
         });
 
     } else if (result[0].user_delete === 1) {
@@ -198,7 +195,7 @@ app.post("/signup-mail", (req, res) => {
         })
     } else {
       // Google認証を使って登録しているユーザーor既にメール認証で登録済のユーザーに対してブラウザにエラーを表示（すでに登録しているユーザーの場合は2を返す）。
-      res.send("2");
+      res.send(sendError);
     };
   });
 });
@@ -232,7 +229,7 @@ app.post("/signup-google", (req, res) => {
 
     } else {
       // 何らかのエラーがあった場合にコンソールに表示
-      console.log(err);
+      console.log("エラー232", err.message);
     };
   });
 });
@@ -247,7 +244,7 @@ app.post("/login-first", (req, res) => {
   db.query("SELECT user_name, sex, birth_date FROM users_info WHERE mail_address = ?", [email], (err, result) => {
     if (err) {
       // 何らかの問題が発生した場合はコンソールにエラーを表示する。
-      console.log(err);
+      console.log("エラー247", err.message);
 
     } else if (result[0].user_name === null && result[0].sex === null && result[0].birth_date === null) {
       // 登録されていない場合は、下記をクライアントに送信
@@ -294,7 +291,7 @@ app.post("/withdrawal", (req, res) => {
   db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [userState.user_withdrawal, dateState.updatedAt, email], (err, result) => {
     if (err) {
       // 何らかのエラーが発生した場合コンソールに表示
-      console.log(err);
+      console.log("エラー294", err.message);
     } else {
       // 退会済にステータスが変更できた場合、結果をクライアントに送信
       res.send(result);
