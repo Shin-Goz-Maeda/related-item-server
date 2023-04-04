@@ -31,3 +31,6 @@ amazonで販売されている商品に関連するインスタ投稿を表示�
 - npm install nodemon
 - npm install mysql2
 - npm install dotenv
+
+### Related Github links
+[関連するGitHubリンク] (https://github.com/Shin-Goz-Maeda/related-item-client)
