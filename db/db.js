@@ -9,11 +9,3 @@ exports.db = mysql.createConnection({
   password: process.env.DB_KEY3,
   database: process.env.DB_KEY4
 });
-
-// exports.db = mysql.createConnection({
-//   host: "192.168.1.3",
-//   port: 13306,
-//   user: "quickstart-user",
-//   password: "password",
-//   database: "quickstart_db"
-// });
