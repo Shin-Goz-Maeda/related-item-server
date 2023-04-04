@@ -25,7 +25,7 @@ amazonで販売されている商品に関連するインスタ投稿を表示�
 - dotenv
 
 ### How to dev Start!!
-- こちらを参考にnode.jsをインストールしてください。(https://codelikes.com/mac-node-install/)
+- こちらを参考にnode.jsをインストールしてください。https://codelikes.com/mac-node-install/
 - npx install express
 - npm install firebase
 - npm install nodemon
@@ -33,4 +33,4 @@ amazonで販売されている商品に関連するインスタ投稿を表示�
 - npm install dotenv
 
 ### Related Github links
-関連するGitHubリンク：(https://github.com/Shin-Goz-Maeda/related-item-client)
+関連するGitHubリンク：https://github.com/Shin-Goz-Maeda/related-item-client
