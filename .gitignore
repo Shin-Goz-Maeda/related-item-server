@@ -4,3 +4,7 @@ node_modules
 
 #dumpfile
 db/dump-2023-03-25.txt
+
+#gcloud
+.gcloudignore
+app.yaml
