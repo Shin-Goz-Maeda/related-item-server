@@ -1,6 +1,6 @@
 // 各種インポート
 const mysql = require("mysql2");
-const env = require('dotenv').config();
+const env = require("dotenv").config();
 
 // DBへアクセス情報（ローカル）
 exports.db = mysql.createConnection({

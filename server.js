@@ -17,7 +17,6 @@ const {
   WithdrawalState,
   MailVerifiedState,
   dateState,
-  SEND_ERROR,
   HOST_DOMAIN
 } = require("./constants/constants");
 
@@ -34,6 +33,7 @@ const {
 app.get("/", (req, res) => {
   try {
     res.send("<h1>hello</h1>");
+    return;
   } catch {
     console.log(err);
   };
@@ -45,7 +45,7 @@ app.get("/onuser", (req, res) => {
   try {
     onAuthStateChanged(auth, (user) => {
       res.send(user);
-    });
+    })
   } catch {
     console.log(err);
   };
@@ -61,6 +61,7 @@ app.get("/getImage", (req, res) => {
         console.log(err);
       } else {
         res.send(result);
+        return;
       };
     });
   } catch {
@@ -80,6 +81,7 @@ app.get("/item/:id", (req, res) => {
         console.log(err);
       } else {
         res.send(result);
+        return;
       };
     });
   } catch {
@@ -103,14 +105,17 @@ app.post("/login-mail", (req, res) => {
           // メールアドレス認証が完了しているメールアドレスはDB-users-user_stateを"2"に変更する。
           db.query("UPDATE users SET user_state = ?, updated_at = ? WHERE mail_address = ?", [MailVerifiedState.user_mailVerified_ok, dateState.updatedAt, email]);
           res.send(result);
+          return;
         } else {
           // メール認証を完了していない場合
-          res.send(SEND_ERROR);
+          res.json({error: "not_mailVerified"});
+          return;
         };
       })
       .catch((error) => {
         // ログイン時に出たエラーをクライアントに送信しブラウザに表示する。
         res.send(error);
+        return;
       });
   } catch {
     console.log(err);
@@ -164,69 +169,76 @@ app.post("/signup-mail", (req, res) => {
     const password = req.body.password;
     const provider = "email";
 
-    // 登録済のユーザーではないかを確認
-    db.query("SELECT user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
-      // 登録していないユーザーの場合は下記処理を実行
-      if (!result[0]) {
-        // DB-usersにユーザ情報を追加する。
-        const SQL = "INSERT INTO users (user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?)";
-        db.query(SQL, [MailVerifiedState.user_add_DB_ok, WithdrawalState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
+    if (email && password) {
+      // 登録済のユーザーではないかを確認
+      db.query("SELECT user_delete FROM users WHERE mail_address = ?", [email], (err, result) => {
+        if (!result[0]) {
+          // 登録していないユーザーの場合は下記処理を実行
+          // DB-usersにユーザ情報を追加する。
+          const SQL = "INSERT INTO users (user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?)";
+          db.query(SQL, [MailVerifiedState.user_add_DB_ok, WithdrawalState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
 
-        // メールアドレス/PWをfirebaseに登録する
-        createUserWithEmailAndPassword(auth, email, password)
-          .then((result) => {
-            // クライアントにユーザー情報を送信
-            res.send(result);
-            // ユーザー個別のIDをfirebaseから取得
-            const uuid = result.user.uid;
+          // メールアドレス/PWをfirebaseに登録する
+          createUserWithEmailAndPassword(auth, email, password)
+            .then((result) => {
+              // ユーザー個別のIDをfirebaseから取得
+              const uuid = result.user.uid;
 
-            db.query("SELECT user_state FROM users WHERE mail_address = ?", [email], (err, result) => {
-              // firebaseに登録が完了したらuserStateを1にする
-              if (result[0].user_state === 0) {
-                // DBの各テーブルに登録ユーザー情報を追加する。
-                db.query("UPDATE users SET user_state = ?, uuid = ?, updated_at = ? WHERE mail_address = ?", [MailVerifiedState.user_add_firebaseAuth_ok, uuid, dateState.updatedAt, email]);
+              // クライアントにユーザー情報を送信
+              res.send(result);
 
-                db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
+              db.query("SELECT user_state FROM users WHERE mail_address = ?", [email], (err, result) => {
+                // firebaseに登録が完了したらuserStateを1にする
+                if (result[0].user_state === 0) {
+                  // DBの各テーブルに登録ユーザー情報を追加する。
+                  db.query("UPDATE users SET user_state = ?, uuid = ?, updated_at = ? WHERE mail_address = ?", [MailVerifiedState.user_add_firebaseAuth_ok, uuid, dateState.updatedAt, email]);
 
-                db.query("INSERT INTO users_want_to_item (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
-              };
+                  db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
 
-              // メール認証完了後のリダイレクトURL
-              const actionCodeSettings = {
-                url: HOST_DOMAIN,
-                handleCodeInApp: false
-              };
+                  db.query("INSERT INTO users_want_to_item (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
+                };
 
-              // メール認証を行うメールを送信
-              sendEmailVerification(auth.currentUser, actionCodeSettings);
+                // メール認証完了後のリダイレクトURL
+                const actionCodeSettings = {
+                  url: HOST_DOMAIN,
+                  handleCodeInApp: false
+                };
+
+                // メール認証を行うメールを送信
+                sendEmailVerification(auth.currentUser, actionCodeSettings);
+              });
+            })
+            .catch((err) => {
+              // 登録できたかった場合にコンソールにエラー表示する。
+              console.log(err);
             });
-          })
-          .catch((err) => {
-            // 登録できたかった場合にコンソールにエラー表示する。
-            console.log(err);
-          });
 
-      } else if (result[0].user_delete === 1) {
-        // 退会ユーザの場合は、退会ステータスを退会していない状態へステータスを変更し、DB内のユーザーステータスをリセット
-        db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [WithdrawalState.user_not_withdrawal, dateState.updatedAt, email]);
+        } else if (result[0].user_delete === 1) {
+          // 退会ユーザの場合は、退会ステータスを退会していない状態へステータスを変更し、DB内のユーザーステータスをリセット
+          db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [WithdrawalState.user_not_withdrawal, dateState.updatedAt, email]);
 
-        db.query("UPDATE users_info SET user_name = NULL, sex = NULL, birth_date = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
+          db.query("UPDATE users_info SET user_name = NULL, sex = NULL, birth_date = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
 
-        db.query("UPDATE users_want_to_item SET want_to_item = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
+          db.query("UPDATE users_want_to_item SET want_to_item = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
 
-        // firebaseのログインメソッド
-        signInWithEmailAndPassword(auth, email, password)
-          .then((result) => {
-            res.send(result);
-          })
-          .catch((err) => {
-            res.send(err);
-          })
-      } else {
-        // Google認証を使って登録しているユーザーor既にメール認証で登録済のユーザーに対してブラウザにエラーを表示（すでに登録しているユーザーの場合は2を返す）。
-        res.send(SEND_ERROR);
-      };
-    });
+          // firebaseのログインメソッド
+          signInWithEmailAndPassword(auth, email, password)
+            .then((result) => {
+              res.send(result);
+              return;
+            })
+            .catch((err) => {
+              res.send(err);
+              return;
+            })
+        } else {
+          // Google認証を使って登録しているユーザーor既にメール認証で登録済のユーザーに対してブラウザにエラーを表示（すでに登録しているユーザーの場合は2を返す）。
+          res.json({error: "already_register"});
+        };
+      });
+    } else {
+      res.json({error: "form_is_empty"});
+    };
   } catch {
     console.log(err);
   };
@@ -272,7 +284,7 @@ app.post("/signup-google", (req, res) => {
 
 
 // ユーザーが初回ログインかどうかを確認する処理
-app.post("/login-first", (req, res) => {
+app.post("/first-login", (req, res) => {
   try {
     // ログインフォームに入力された値をクライアントから取得
     const email = req.body.email;
@@ -340,6 +352,7 @@ app.post("/withdrawal", (req, res) => {
       } else {
         // 退会済にステータスが変更できた場合、結果をクライアントに送信
         res.send(result);
+        return;
       };
     });
   } catch {

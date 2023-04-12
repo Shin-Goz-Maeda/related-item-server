@@ -1,5 +1,5 @@
 // firebase設定
-const { initializeApp } = require('firebase/app');
+const { initializeApp } = require("firebase/app");
 const { getAuth } = require("firebase/auth");
 
 // Google認証
