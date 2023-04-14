@@ -34,7 +34,7 @@ app.get("/", (req, res) => {
   try {
     res.send("<h1>hello</h1>");
     return;
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -46,7 +46,7 @@ app.get("/onuser", (req, res) => {
     onAuthStateChanged(auth, (user) => {
       res.send(user);
     })
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -64,7 +64,7 @@ app.get("/getImage", (req, res) => {
         return;
       };
     });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -84,7 +84,7 @@ app.get("/item/:id", (req, res) => {
         return;
       };
     });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -117,7 +117,7 @@ app.post("/login-mail", (req, res) => {
         res.send(error);
         return;
       });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -155,7 +155,7 @@ app.post("/login-google", (req, res) => {
         console.log(err);
       };
     });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -239,7 +239,7 @@ app.post("/signup-mail", (req, res) => {
     } else {
       res.json({error: "form_is_empty"});
     };
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -277,7 +277,7 @@ app.post("/signup-google", (req, res) => {
         console.log(err);
       };
     });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -304,7 +304,7 @@ app.post("/first-login", (req, res) => {
         res.status(201).send(result[0]);
       };
     });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -332,7 +332,7 @@ app.post("/user-info", (req, res) => {
         res.status(200).send(result[0]);
       };
     });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
@@ -355,7 +355,7 @@ app.post("/withdrawal", (req, res) => {
         return;
       };
     });
-  } catch {
+  } catch (err) {
     console.log(err);
   };
 });
