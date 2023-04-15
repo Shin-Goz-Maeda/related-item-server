@@ -1,5 +1,6 @@
 const env = require("dotenv").config();
 
+
 // ユーザーステータス
 exports.WithdrawalState = {
   // 退会ステータス
@@ -14,12 +15,10 @@ exports.MailVerifiedState = {
   user_mailVerified_ok: 2
 };
 
-
 // 日時設定
 exports.dateState = {
   createdAt: Date.now(),
   updatedAt: Date.now()
 };
-
 
 exports.HOST_DOMAIN = process.env.HOST_DOMAIN;

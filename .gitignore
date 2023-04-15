@@ -1,12 +1,14 @@
 #general
 node_modules
-.env
 .env.development
 .env.production
+.env
+dist
 
 #dumpfile
-db/dump-2023-03-25.txt
+related_item_20230415.sql
 
 #gcloud
 .gcloudignore
 app.yaml
+webpack.config.js

@@ -7,10 +7,10 @@ app.use(cors());
 app.use(express.json());
 
 // db設定インポート
-const { db } = require("../related-item-server/db/db");
+const { db } = require("./db/db");
 
 // firebase設定インポート
-const { auth } = require("../related-item-server/firebase/firebase");
+const { auth } = require("./firebase/firebase");
 
 // 共通する定数
 const {

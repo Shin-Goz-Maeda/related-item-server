@@ -9,11 +9,11 @@
     "mysql2": "^3.2.0",
     "nodemon": "^2.0.20",
     "parser": "^0.1.4",
-    "promise-mysql": "^5.2.0",
-    "sequelize": "^6.31.0"
+    "promise-mysql": "^5.2.0"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "webpack"
   },
   "name": "related-item-server",
   "version": "1.0.0",
@@ -28,5 +28,15 @@
     "url": "https://github.com/Shin-Goz-Maeda/related-item-server/issues"
   },
   "homepage": "https://github.com/Shin-Goz-Maeda/related-item-server#readme",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-loader": "^9.1.2",
+    "babel-preset-env": "^1.7.0",
+    "html-loader": "^4.2.0",
+    "html-webpack-plugin": "^5.5.0",
+    "webpack": "^5.79.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-node-externals": "^3.0.0"
+  }
 }
