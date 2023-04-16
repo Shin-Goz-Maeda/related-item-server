@@ -40,20 +40,8 @@ app.get("/", (req, res) => {
 });
 
 
-// ブラウザをリロードしたときログインしているユーザーを取得
-app.get("/onuser", (req, res) => {
-  try {
-    onAuthStateChanged(auth, (user) => {
-      res.send(user);
-    })
-  } catch (err) {
-    console.log(err);
-  };
-});
-
-
 // すべてのアイテム情報をDBから取得する
-app.get("/getImage", (req, res) => {
+app.get("/get-image", (req, res) => {
   try {
     const SQL = "SELECT brand, item_category, item_name, item_img_url, id FROM items_info";
     db.query(SQL, (err, result) => {
@@ -136,7 +124,7 @@ app.post("/login-google", (req, res) => {
       // メールアドレスの登録がなく、退会ユーザーではない場合はDBに情報を追加
       if (!result[0]) {
         const SQL = "INSERT INTO users (uuid, user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?, ?)";
-        db.query(SQL, [uuid, MailVerifiedState.user_add_DB_ok, WithdrawalState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
+        db.query(SQL, [uuid, MailVerifiedState.user_mailVerified_ok, WithdrawalState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
 
         db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
 
@@ -200,7 +188,7 @@ app.post("/signup-mail", (req, res) => {
 
                 // メール認証完了後のリダイレクトURL
                 const actionCodeSettings = {
-                  url: HOST_DOMAIN,
+                  url: HOST_DOMAIN + "/login",
                   handleCodeInApp: false
                 };
 
@@ -258,7 +246,7 @@ app.post("/signup-google", (req, res) => {
       if (!result[0]) {
         // 過去に登録のないユーザーの場合は、DBの各テーブルにユーザー情報を追加
         const SQL = "INSERT INTO users (uuid, user_state, user_delete, mail_address, provider, created_at, updated_at) VALUE (?, ?, ?, ?, ?, ?, ?)";
-        db.query(SQL, [uuid, MailVerifiedState.user_add_DB_ok, WithdrawalState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
+        db.query(SQL, [uuid, MailVerifiedState.user_mailVerified_ok, WithdrawalState.user_not_withdrawal, email, provider, dateState.createdAt, dateState.updatedAt]);
 
         db.query("INSERT INTO users_info (mail_address, created_at, updated_at) VALUE (?, ?, ?)", [email, dateState.createdAt, dateState.updatedAt]);
 
@@ -267,6 +255,7 @@ app.post("/signup-google", (req, res) => {
       } else if (result[0].user_delete === 1) {
         // 退会ユーザの場合は、退会ステータスを退会していない状態へ変更
         db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [WithdrawalState.user_not_withdrawal, dateState.updatedAt, email]);
+        res.send(result[0]);
 
       } else if (result[0].user_delete === 0) {
         // 以前メールアドレスで会員登録済のユーザがGoogle認証で登録した場合
@@ -330,6 +319,28 @@ app.post("/user-info", (req, res) => {
       } else {
         // 問題なく登録できた場合は下記をクライアントに送信
         res.status(200).send(result[0]);
+      };
+    });
+  } catch (err) {
+    console.log(err);
+  };
+});
+
+
+// PWをリセットする際にDBに登録してあるかを確認する処理
+app.post("/mail-check", (req, res) => {
+  try {
+    // フォームに入力した値を取得
+    const email = req.body.email;
+
+    db.query("SELECT mail_address FROM users WHERE mail_address = ?", [email], (err, result) => {
+      if (err) {
+        // 何らかのエラーが発生した場合コンソールに表示
+        console.log(err);
+      } else {
+        // メールアドレスの登録の有無をクライアントに送信
+        res.send(result);
+        return;
       };
     });
   } catch (err) {

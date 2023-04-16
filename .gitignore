@@ -6,7 +6,7 @@ node_modules
 dist
 
 #dumpfile
-related_item_20230415.sql
+dumpfile_2023-04-16.sql
 
 #gcloud
 .gcloudignore
