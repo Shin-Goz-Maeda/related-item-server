@@ -300,7 +300,7 @@ app.post("/first-login", (req, res) => {
 
 
 // 初回ログイン時orアカウント登録情報を更新した際の処理
-app.post("/user-info", (req, res) => {
+app.post("/user-info-create", (req, res) => {
   try {
     // フォームに入力された値をクライアントから取得
     const email = req.body.email;
@@ -319,6 +319,25 @@ app.post("/user-info", (req, res) => {
       } else {
         // 問題なく登録できた場合は下記をクライアントに送信
         res.status(200).send(result[0]);
+      };
+    });
+  } catch (err) {
+    console.log(err);
+  };
+});
+
+
+// 登録済のアカウント情報を取得する。
+app.post("/get-user-info", (req, res) => {
+  try {
+    const email = req.body.email;
+    const SQL = "SELECT user_name, sex, birth_date, want_to_item FROM users_info INNER JOIN users_want_to_item WHERE users_info.mail_address = ?";
+    db.query(SQL, [email], (err, result) => {
+      if (err) {
+        console.log(err);
+      } else {
+        res.send(result);
+        return;
       };
     });
   } catch (err) {
