@@ -302,7 +302,6 @@ app.post("/first-login", (req, res) => {
 // 初回ログイン時orアカウント登録情報を更新した際の処理
 app.post("/user-info-create", (req, res) => {
   try {
-    console.log(req.body);
     // フォームに入力された値をクライアントから取得
     const email = req.body.email;
     const userName = req.body.userName;
@@ -332,14 +331,11 @@ app.post("/user-info-create", (req, res) => {
 app.post("/get-user-info", (req, res) => {
   try {
     const email = req.body.email;
-    console.log("getuser-info", req.body)
-    // const SQL = "SELECT user_name, sex, birth_date, want_to_item FROM users_info INNER JOIN users_want_to_item WHERE users_info.mail_address = ?";
     const SQL = "SELECT user_name, sex, birth_date, want_to_item FROM users_info INNER JOIN users_want_to_item ON users_info.mail_address = users_want_to_item.mail_address WHERE users_info.mail_address = ?";
     db.query(SQL, [email], (err, result) => {
       if (err) {
         console.log(err);
       } else {
-        console.log("accountinfo", result)
         res.send(result);
         return;
       };
