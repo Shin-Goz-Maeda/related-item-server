@@ -85,26 +85,32 @@ app.post("/login-mail", (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
 
-    // firebaseのログインメソッド
-    signInWithEmailAndPassword(auth, email, password)
-      .then((result) => {
-        // ログインユーザーのメール認証状況を確認
-        if (result.user.emailVerified) {
-          // メールアドレス認証が完了しているメールアドレスはDB-users-user_stateを"2"に変更する。
-          db.query("UPDATE users SET user_state = ?, updated_at = ? WHERE mail_address = ?", [MailVerifiedState.user_mailVerified_ok, dateState.updatedAt, email]);
-          res.send(result);
+    db.query("SELECT mail_address FROM users WHERE mail_address = ?", [email], (err, result) => {
+      if (result[0] === "undefined") {
+        res.json({error: "not_register"});
+      } else {
+        // firebaseのログインメソッド
+        signInWithEmailAndPassword(auth, email, password)
+        .then((result) => {
+          // ログインユーザーのメール認証状況を確認
+          if (result.user.emailVerified) {
+            // メールアドレス認証が完了しているメールアドレスはDB-users-user_stateを"2"に変更する。
+            db.query("UPDATE users SET user_state = ?, updated_at = ? WHERE mail_address = ?", [MailVerifiedState.user_mailVerified_ok, dateState.updatedAt, email]);
+            res.send(result);
+            return;
+          } else {
+            // メール認証を完了していない場合
+            res.json({error: "not_mailVerified"});
+            return;
+          };
+        })
+        .catch((error) => {
+          // ログイン時に出たエラーをクライアントに送信しブラウザに表示する。
+          res.send(error);
           return;
-        } else {
-          // メール認証を完了していない場合
-          res.json({error: "not_mailVerified"});
-          return;
-        };
-      })
-      .catch((error) => {
-        // ログイン時に出たエラーをクライアントに送信しブラウザに表示する。
-        res.send(error);
-        return;
-      });
+        });
+      };
+    });
   } catch (err) {
     console.log(err);
   };
@@ -133,6 +139,10 @@ app.post("/login-google", (req, res) => {
       } else if (result[0].user_delete === 1) {
         // 退会ユーザの場合は、退会ステータスを退会していない状態へ変更
         db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [WithdrawalState.user_not_withdrawal, dateState.updatedAt, email]);
+
+        db.query("UPDATE users_info SET user_name = NULL, sex = NULL, birth_date = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
+
+        db.query("UPDATE users_want_to_item SET want_to_item = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
 
       } else if (result[0].user_delete === 0) {
         // 以前メールアドレスで会員登録済のユーザがGoogle認証で登録した場合
@@ -257,6 +267,10 @@ app.post("/signup-google", (req, res) => {
         db.query("UPDATE users SET user_delete = ?, updated_at = ? WHERE mail_address = ?", [WithdrawalState.user_not_withdrawal, dateState.updatedAt, email]);
         res.send(result[0]);
 
+        db.query("UPDATE users_info SET user_name = NULL, sex = NULL, birth_date = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
+
+        db.query("UPDATE users_want_to_item SET want_to_item = NULL, updated_at = ? WHERE mail_address = ?", [dateState.updatedAt, email]);
+
       } else if (result[0].user_delete === 0) {
         // 以前メールアドレスで会員登録済のユーザがGoogle認証で登録した場合
         db.query("UPDATE users SET provider = ? WHERE mail_address = ?", [provider, email]);
@@ -308,19 +322,34 @@ app.post("/user-info-create", (req, res) => {
     const birthDay = req.body.birthDay;
     const sex = req.body.selectedSex;
     const recommendItems = req.body.recommendItemJson;
+    const birthDayMonth1 = birthDay.charAt(4);
+    const birthDayMonth2 = birthDay.charAt(5);
+    const birthDayDate1 = birthDay.charAt(6);
+    const birthDayDate2 = birthDay.charAt(7);
+    const birthDayMonth = "" + birthDayMonth1 + birthDayMonth2;
+    const birthDayDate = "" + birthDayDate1 + birthDayDate2;
+    const date = new Date(Date.now());
+    const year = date.getFullYear();
+    const month =  ("00" + (date.getMonth()+1)).slice(-2);
+    const day = ("00" + (date.getDate())).slice(-2);
+    const today = "" + year + month + day;
 
-    // DBの各テーブルにアカウント情報に情報を追加
-    db.query("UPDATE users_info SET user_name = ?, sex = ?, birth_date = ?, updated_at = ? WHERE mail_address = ?", [userName, sex, birthDay, dateState.updatedAt, email]);
+    if (today >= birthDay && birthDayMonth <= 12 && birthDayDate <= 31) {
+      // DBの各テーブルにアカウント情報に情報を追加
+      db.query("UPDATE users_info SET user_name = ?, sex = ?, birth_date = ?, updated_at = ? WHERE mail_address = ?", [userName, sex, birthDay, dateState.updatedAt, email]);
 
-    db.query("UPDATE users_want_to_item SET want_to_item = ?, updated_at = ? WHERE mail_address = ?", [recommendItems, dateState.updatedAt, email], (err, result) => {
-      if (err) {
-        // 何らかのエラーが発生した場合は下記をクライアントに送信
-        res.status(400).send(result[0]);
-      } else {
-        // 問題なく登録できた場合は下記をクライアントに送信
-        res.status(200).send(result[0]);
-      };
-    });
+      db.query("UPDATE users_want_to_item SET want_to_item = ?, updated_at = ? WHERE mail_address = ?", [recommendItems, dateState.updatedAt, email], (err, result) => {
+        if (err) {
+          // 何らかのエラーが発生した場合は下記をクライアントに送信
+          res.status(400).send(result[0]);
+        } else {
+          // 問題なく登録できた場合は下記をクライアントに送信
+          res.status(200).send(result[0]);
+        };
+      });
+    } else {
+      res.status(401).send("誕生日が正しくありません。");
+    };
   } catch (err) {
     console.log(err);
   };
@@ -353,6 +382,28 @@ app.post("/mail-check", (req, res) => {
     const email = req.body.email;
 
     db.query("SELECT mail_address FROM users WHERE mail_address = ?", [email], (err, result) => {
+      if (err) {
+        // 何らかのエラーが発生した場合コンソールに表示
+        console.log(err);
+      } else {
+        // メールアドレスの登録の有無をクライアントに送信
+        res.send(result);
+        return;
+      };
+    });
+  } catch (err) {
+    console.log(err);
+  };
+});
+
+
+// ログインしているユーザーの使用しているログイン方法を取得
+app.post("/login-provider", (req, res) => {
+  try {
+    // フォームに入力した値を取得
+    const email = req.body.email;
+
+    db.query("SELECT provider FROM users WHERE mail_address = ?", [email], (err, result) => {
       if (err) {
         // 何らかのエラーが発生した場合コンソールに表示
         console.log(err);
